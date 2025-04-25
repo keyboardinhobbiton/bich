@@ -303,3 +303,218 @@ document.addEventListener('DOMContentLoaded', function() {
             cartItems.innerHTML = '<p class="text-center">Il tuo carrello è vuoto</p>';
             cartSubtotal.textContent = '€0.00';
             cartTotal.textContent
+            cartTotal.textContent = '€0.50';
+            checkoutBtn.disabled = true;
+        } else {
+            // Calcola subtotale
+            const subtotal = cart.reduce((total, item) => 
+                total + (item.product.price * item.quantity), 0);
+            
+            // Mostra elementi nel carrello
+            cartItems.innerHTML = '';
+            const cartList = document.createElement('ul');
+            cartList.className = 'list-group mb-3';
+            
+            cart.forEach((item, index) => {
+                const listItem = document.createElement('li');
+                listItem.className = 'list-group-item d-flex justify-content-between align-items-center';
+                listItem.innerHTML = `
+                    <div>
+                        <h6 class="my-0">${item.product.title}</h6>
+                        <small class="text-muted">€${item.product.price} x ${item.quantity}</small>
+                    </div>
+                    <span>€${(item.product.price * item.quantity).toFixed(2)}</span>
+                    <button class="btn btn-sm btn-outline-danger remove-item" data-index="${index}">×</button>
+                `;
+                cartList.appendChild(listItem);
+            });
+            
+            cartItems.appendChild(cartList);
+            
+            // Aggiungi listener per rimuovere articoli
+            document.querySelectorAll('.remove-item').forEach(button => {
+                button.addEventListener('click', function() {
+                    const index = parseInt(this.getAttribute('data-index'));
+                    cart.splice(index, 1);
+                    updateCartCount();
+                    showCart(); // Aggiorna la visualizzazione del carrello
+                });
+            });
+            
+            // Aggiorna totali
+            cartSubtotal.textContent = `€${subtotal.toFixed(2)}`;
+            
+            // Ogni transazione ha una commissione fissa di €0.50
+            const serviceFee = 0.50;
+            const total = subtotal + serviceFee;
+            cartTotal.textContent = `€${total.toFixed(2)}`;
+            
+            // Abilita pulsante checkout
+            checkoutBtn.disabled = false;
+        }
+        
+        cartModal.show();
+    }
+    
+    // Mostra la modale di pagamento
+    function showPaymentModal() {
+        cartModal.hide();
+        
+        // Reset form
+        document.getElementById('paymentForm').reset();
+        
+        paymentModal.show();
+    }
+    
+    // Processa il pagamento
+    function processPayment() {
+        if (!validatePaymentForm()) {
+            showNotification('Completa tutti i campi del pagamento', 'danger');
+            return;
+        }
+        
+        paymentModal.hide();
+        
+        // Mostra spinner di caricamento per simulare elaborazione
+        appendMessage('Sto elaborando il tuo pagamento...', 'assistant');
+        
+        // Simula una chiamata API per il checkout
+        setTimeout(() => {
+            // Calcola totali
+            const subtotal = cart.reduce((total, item) => 
+                total + (item.product.price * item.quantity), 0);
+            const serviceFee = 0.50;
+            const total = subtotal + serviceFee;
+            
+            // Crea un mock dell'ordine completato
+            const order = {
+                id: 'ORD-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
+                items: cart.map(item => ({
+                    product: item.product,
+                    quantity: item.quantity,
+                    price: item.product.price,
+                    total: item.product.price * item.quantity
+                })),
+                subtotal: subtotal.toFixed(2),
+                serviceFee: serviceFee.toFixed(2),
+                total: total.toFixed(2),
+                paymentInfo: {
+                    cardNumber: maskCardNumber(document.getElementById('cardNumber').value),
+                    date: new Date().toLocaleString()
+                }
+            };
+            
+            // Mostra conferma ordine
+            displayOrderConfirmation(order);
+            
+            // Messaggio di conferma nella chat
+            appendMessage(`Ordine completato! Il tuo ordine #${order.id} è stato confermato per un totale di €${order.total}.`, 'assistant');
+            
+            // Svuota il carrello
+            cart = [];
+            updateCartCount();
+        }, 2000);
+    }
+    
+    // Valida form di pagamento (semplice validazione di completezza)
+    function validatePaymentForm() {
+        const cardNumber = document.getElementById('cardNumber').value.trim();
+        const expiryDate = document.getElementById('expiryDate').value.trim();
+        const cvv = document.getElementById('cvv').value.trim();
+        const cardName = document.getElementById('cardName').value.trim();
+        
+        return cardNumber && expiryDate && cvv && cardName;
+    }
+    
+    // Mascheramento numero carta
+    function maskCardNumber(cardNumber) {
+        const clean = cardNumber.replace(/\D/g, '');
+        return 'xxxx-xxxx-xxxx-' + clean.slice(-4);
+    }
+    
+    // Mostra conferma ordine
+    function displayOrderConfirmation(order) {
+        orderConfirmationDetails.innerHTML = `
+            <div class="text-center mb-4">
+                <div class="display-1 text-success">
+                    <i class="bi bi-check-circle"></i>
+                </div>
+                <h4>Grazie per il tuo ordine!</h4>
+                <p class="text-muted">Numero Ordine: <strong>${order.id}</strong></p>
+                <p class="text-muted">Data: ${order.paymentInfo.date}</p>
+            </div>
+            
+            <h5>Riepilogo ordine</h5>
+            <ul class="list-group mb-3">
+                ${order.items.map(item => `
+                    <li class="list-group-item d-flex justify-content-between lh-sm">
+                        <div>
+                            <h6 class="my-0">${item.product.title}</h6>
+                            <small class="text-muted">${item.quantity} x €${item.price}</small>
+                        </div>
+                        <span>€${item.total.toFixed(2)}</span>
+                    </li>
+                `).join('')}
+                
+                <li class="list-group-item d-flex justify-content-between">
+                    <span>Subtotale</span>
+                    <span>€${order.subtotal}</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between">
+                    <span>Commissione di servizio</span>
+                    <span>€${order.serviceFee}</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between text-success fw-bold">
+                    <span>Totale</span>
+                    <span>€${order.total}</span>
+                </li>
+            </ul>
+            
+            <div class="alert alert-info">
+                <small>
+                    <strong>Nota:</strong> Questo è un ordine simulato. Nessun pagamento reale è stato effettuato.
+                </small>
+            </div>
+        `;
+        
+        orderConfirmationModal.show();
+    }
+    
+    // Mostra notifica temporanea
+    function showNotification(message, type = 'success') {
+        const notification = document.createElement('div');
+        notification.className = `alert alert-${type} notification-toast`;
+        notification.innerHTML = message;
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.zIndex = '1050';
+        notification.style.minWidth = '250px';
+        
+        document.body.appendChild(notification);
+        
+        // Rimuovi dopo 3 secondi
+        setTimeout(() => {
+            notification.remove();
+        }, 3000);
+    }
+    
+    // Carica tutti i prodotti all'avvio
+    function loadInitialProducts() {
+        fetch('/api/products')
+            .then(response => response.json())
+            .then(products => {
+                // Mostra alcuni prodotti di tendenza
+                const featuredProducts = products.slice(0, 4);
+                displaySearchResults(featuredProducts);
+                
+                appendMessage('Ho caricato alcuni prodotti popolari che potrebbero interessarti!', 'assistant');
+            })
+            .catch(error => {
+                console.error('Errore nel caricamento prodotti:', error);
+            });
+    }
+    
+    // Carica i prodotti all'avvio
+    loadInitialProducts();
+});
