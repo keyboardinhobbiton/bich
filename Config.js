@@ -282,7 +282,7 @@ app.listen(PORT, () => {
 
 // File .env da creare (esempio)
 /*
-OPENAI_API_KEY=your_openai_api_key
+OPENAI_API_KEY=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
 SHOPIFY_API_KEY=your_shopify_api_key
 SHOPIFY_API_SECRET=your_shopify_api_secret
 SHOPIFY_HOST_NAME=your_app_url
