@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trinity | Enter The Matrix</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            color: #00FF41;
+            font-family: "Courier New", monospace;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+        
+        .matrix-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            opacity: 0.15;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 0;
+            border-bottom: 1px solid #00FF41;
+        }
+        
+        .logo {
+            font-size: 2.5rem;
+            font-weight: bold;
+            letter-spacing: 3px;
+            text-shadow: 0 0 10px #00FF41;
+        }
+        
+        nav ul {
+            display: flex;
+            list-style: none;
+        }
+        
+        nav ul li {
+            margin-left: 30px;
+        }
+        
+        nav ul li a {
+            color: #00FF41;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            font-size: 1.1rem;
+            letter-spacing: 1px;
+        }
+        
+        nav ul li a:hover {
+            color: #fff;
+            text-shadow: 0 0 10px #00FF41;
+        }
+        
+        .hero {
+            height: 70vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+        
+        .hero h1 {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            letter-spacing: 5px;
+            text-shadow: 0 0 15px #00FF41;
+        }
+        
+        .hero p {
+            font-size: 1.2rem;
+            max-width: 700px;
+            margin-bottom: 40px;
+        }
+        
+        .button {
+            display: inline-block;
+            padding: 12px 30px;
+            background-color: transparent;
+            color: #00FF41;
+            border: 2px solid #00FF41;
+            text-decoration: none;
+            font-size: 1.1rem;
+            letter-spacing: 2px;
+            transition: all 0.3s ease;
+            margin: 10px;
+        }
+        
+        .button:hover {
+            background-color: #00FF41;
+            color: #000;
+            box-shadow: 0 0 20px #00FF41;
+        }
+        
+        .sections {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            margin: 50px 0;
+        }
+        
+        .section {
+            flex-basis: 30%;
+            background-color: rgba(0, 0, 0, 0.7);
+            border: 1px solid #00FF41;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 0 10px rgba(0, 255, 65, 0.3);
+            transition: all 0.3s ease;
+        }
+        
+        .section:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.5);
+        }
+        
+        .section h2 {
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+            letter-spacing: 2px;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 30px 0;
+            border-top: 1px solid #00FF41;
+            font-size: 0.9rem;
+        }
+        
+        /* Matrix Rain Effect */
+        canvas {
+            display: block;
+            position: fixed;
+            top: 0;
+            left: 0;
+        }
+        
+        /* Glitch Effect */
+        .glitch {
+            position: relative;
+        }
+        
+        .glitch::before, .glitch::after {
+            content: attr(data-text);
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .glitch::before {
+            left: 2px;
+            text-shadow: -1px 0 red;
+            animation: glitch-1 2s infinite linear alternate-reverse;
+        }
+        
+        .glitch::after {
+            left: -2px;
+            text-shadow: 1px 0 blue;
+            animation: glitch-2 3s infinite linear alternate-reverse;
+        }
+        
+        @keyframes glitch-1 {
+            0% {
+                clip-path: inset(20% 0 30% 0);
+            }
+            20% {
+                clip-path: inset(60% 0 1% 0);
+            }
+            40% {
+                clip-path: inset(25% 0 58% 0);
+            }
+            60% {
+                clip-path: inset(91% 0 6% 0);
+            }
+            80% {
+                clip-path: inset(3% 0 46% 0);
+            }
+            100% {
+                clip-path: inset(82% 0 2% 0);
+            }
+        }
+        
+        @keyframes glitch-2 {
+            0% {
+                clip-path: inset(59% 0 43% 0);
+            }
+            20% {
+                clip-path: inset(22% 0 73% 0);
+            }
+            40% {
+                clip-path: inset(9% 0 72% 0);
+            }
+            60% {
+                clip-path: inset(31% 0 40% 0);
+            }
+            80% {
+                clip-path: inset(63% 0 26% 0);
+            }
+            100% {
+                clip-path: inset(14% 0 84% 0);
+            }
+        }
+        
+        /* Responsive Styling */
+        @media screen and (max-width: 768px) {
+            .sections {
+                flex-direction: column;
+            }
+            
+            .section {
+                flex-basis: 100%;
+            }
+            
+            header {
+                flex-direction: column;
+            }
+            
+            nav ul {
+                flex-direction: column;
+                align-items: center;
+                padding: 0;
+            }
+            
+            nav ul li {
+                margin: 10px 0;
+            }
+            
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="matrix" class="matrix-bg"></canvas>
+    <div class="container">
+        <header>
+            <div class="logo">TRINITY</div>
+            <nav>
+                <ul>
+                    <li><a href="#home">HOME</a></li>
+                    <li><a href="#about">ABOUT</a></li>
+                    <li><a href="#services">SERVICES</a></li>
+                    <li><a href="#contact">CONTACT</a></li>
+                </ul>
+            </nav>
+        </header>
+        
+        <section class="hero" id="home">
+            <h1 class="glitch" data-text="TRINITY">TRINITY</h1>
+            <p>The choice is yours. The blue pill or the red pill. Stay in the illusion or discover the truth.</p>
+            <div>
+                <a href="#about" class="button">TAKE THE RED PILL</a>
+                <a href="#contact" class="button">FOLLOW THE WHITE RABBIT</a>
+            </div>
+        </section>
+        
+        <section class="sections" id="about">
+            <div class="section">
+                <h2>THE MATRIX</h2>
+                <p>The Matrix is everywhere. It is all around us. Even now, in this very room. You can see it when you look out your window or when you turn on your television.</p>
+                <p>You can feel it when you go to work... when you go to church... when you pay your taxes.</p>
+            </div>
+            <div class="section">
+                <h2>THE ONE</h2>
+                <p>I know you're out there. I can feel you now. I know that you're afraid. You're afraid of us. You're afraid of change.</p>
+                <p>I don't know the future. I didn't come here to tell you how this is going to end. I came here to tell you how it's going to begin.</p>
+            </div>
+            <div class="section">
+                <h2>FREE YOUR MIND</h2>
+                <p>Do you believe in fate, Neo? No. Why not? Because I don't like the idea that I'm not in control of my life.</p>
+                <p>You have to let it all go, Neo. Fear, doubt, and disbelief. Free your mind.</p>
+            </div>
+        </section>
+        
+        <section class="sections" id="services">
+            <div class="section">
+                <h2>COMBAT TRAINING</h2>
+                <p>I know kung fu. Show me. You think that's air you're breathing now?</p>
+                <p>Learn to bend the rules of the Matrix and harness your true potential.</p>
+            </div>
+            <div class="section">
+                <h2>SYSTEM INFILTRATION</h2>
+                <p>I can only show you the door. You're the one that has to walk through it.</p>
+                <p>Specialized extraction and infiltration services for the most secure systems.</p>
+            </div>
+            <div class="section">
+                <h2>PROPHECY CONSULTATION</h2>
+                <p>There is no spoon. It is not the spoon that bends, it is only yourself.</p>
+                <p>Understanding your role in the greater system and how to fulfill your potential.</p>
+            </div>
+        </section>
+        
+        <section class="sections" id="contact">
+            <div class="section" style="flex-basis: 100%;">
+                <h2>CONTACT US</h2>
+                <p>We've been watching you for some time now, Mr. Anderson. It seems that you've been living two lives.</p>
+                <p>Follow the white rabbit. Knock, knock, Neo.</p>
+                <a href="#" class="button">SEND MESSAGE</a>
+            </div>
+        </section>
+        
+        <footer>
+            <p>© 2025 TRINITY | WELCOME TO THE DESERT OF THE REAL</p>
+        </footer>
+    </div>
+
+    <script>
+        // Matrix Rain Effect
+        const canvas = document.getElementById('matrix');
+        const ctx = canvas.getContext('2d');
+        
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        const katakana = 'アァカサタナハマヤャラワガザダバパイィキシチニヒミリヰギジヂビピウゥクスツヌフムユュルグズブヅプエェケセテネヘメレヱゲゼデベペオォコソトノホモヨョロヲゴゾドボポヴッン';
+        const latin = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        const nums = '0123456789';
+        
+        const alphabet = katakana + latin + nums;
+        
+        const fontSize = 16;
+        const columns = canvas.width / fontSize;
+        
+        const rainDrops = [];
+        
+        for (let x = 0; x < columns; x++) {
+            rainDrops[x] = 1;
+        }
+        
+        const draw = () => {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.fillStyle = '#0F0';
+            ctx.font = fontSize + 'px monospace';
+            
+            for (let i = 0; i < rainDrops.length; i++) {
+                const text = alphabet.charAt(Math.floor(Math.random() * alphabet.length));
+                ctx.fillText(text, i * fontSize, rainDrops[i] * fontSize);
+                
+                if (rainDrops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                    rainDrops[i] = 0;
+                }
+                rainDrops[i]++;
+            }
+        };
+        
+        setInterval(draw, 30);
+        
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+    </script>
+</body>
+</html>
