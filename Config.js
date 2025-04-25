@@ -4,7 +4,7 @@ const bodyParser = require('body-parser');
 const dotenv = require('dotenv');
 const { OpenAI } = require('openai');
 const Shopify = require('@shopify/shopify-api');
-const stripe = require('stripe');
+const paypal = require('@paypal/checkout-server-sdk');
 
 // Caricamento variabili d'ambiente
 dotenv.config();
@@ -27,8 +27,14 @@ const shopify = Shopify.shopifyApi({
   apiVersion: '2023-07'
 });
 
-// Inizializzazione Stripe per gestire i pagamenti
-const stripeClient = stripe(process.env.STRIPE_SECRET_KEY);
+// Inizializzazione PayPal
+function getPayPalClient() {
+  const environment = process.env.NODE_ENV === 'production'
+    ? new paypal.core.LiveEnvironment(process.env.PAYPAL_CLIENT_ID, process.env.PAYPAL_CLIENT_SECRET)
+    : new paypal.core.SandboxEnvironment(process.env.PAYPAL_CLIENT_ID, process.env.PAYPAL_CLIENT_SECRET);
+  
+  return new paypal.core.PayPalHttpClient(environment);
+}
 
 // Commissione per il servizio
 const SERVICE_FEE = 0.50; // in euro
@@ -144,23 +150,87 @@ async function createShopifyOrder(session, productId, quantity, customerInfo) {
   }
 }
 
-// Creazione del pagamento con Stripe
-async function createPaymentIntent(amount, currency = 'eur', customer) {
+// Funzione per creare un ordine PayPal
+async function createPayPalOrder(amount, currency = 'EUR', orderDescription) {
   try {
-    const paymentIntent = await stripeClient.paymentIntents.create({
-      amount: Math.round(amount * 100), // Conversione in centesimi
-      currency,
-      customer: customer.id,
-      description: `Ordine con commissione servizio di ${SERVICE_FEE} EUR`,
-      metadata: {
-        serviceFee: SERVICE_FEE
+    const paypalClient = getPayPalClient();
+    const request = new paypal.orders.OrdersCreateRequest();
+    
+    // Conversione in formato corretto per PayPal (due decimali come stringa)
+    const formattedAmount = amount.toFixed(2);
+    
+    request.prefer("return=representation");
+    request.requestBody({
+      intent: 'CAPTURE',
+      purchase_units: [{
+        amount: {
+          currency_code: currency,
+          value: formattedAmount,
+          breakdown: {
+            item_total: {
+              currency_code: currency,
+              value: (amount - SERVICE_FEE).toFixed(2)
+            },
+            handling: {
+              currency_code: currency,
+              value: SERVICE_FEE.toFixed(2)
+            }
+          }
+        },
+        description: orderDescription,
+        custom_id: Date.now().toString(),
+        items: [
+          {
+            name: 'Commissione servizio',
+            unit_amount: {
+              currency_code: currency,
+              value: SERVICE_FEE.toFixed(2)
+            },
+            quantity: '1',
+            description: 'Commissione per il servizio di orchestrazione'
+          }
+        ]
+      }],
+      application_context: {
+        brand_name: 'Magico Emporio di Shopify',
+        landing_page: 'BILLING',
+        shipping_preference: 'SET_PROVIDED_ADDRESS',
+        user_action: 'PAY_NOW',
+        return_url: `${process.env.APP_URL}/paypal-success`,
+        cancel_url: `${process.env.APP_URL}/paypal-cancel`
       }
     });
+
+    const response = await paypalClient.execute(request);
     
-    return paymentIntent;
+    return {
+      orderId: response.result.id,
+      approvalUrl: response.result.links.find(link => link.rel === 'approve').href,
+      status: response.result.status
+    };
   } catch (error) {
-    console.error("Errore Stripe:", error);
-    throw new Error("Impossibile processare il pagamento");
+    console.error("Errore PayPal:", error);
+    throw new Error("Impossibile creare l'ordine PayPal");
+  }
+}
+
+// Funzione per catturare un pagamento PayPal già approvato
+async function capturePayPalOrder(orderId) {
+  try {
+    const paypalClient = getPayPalClient();
+    const request = new paypal.orders.OrdersCaptureRequest(orderId);
+    request.requestBody({});
+    
+    const response = await paypalClient.execute(request);
+    
+    return {
+      captureId: response.result.purchase_units[0].payments.captures[0].id,
+      status: response.result.status,
+      result: response.result
+    };
+  } catch (error) {
+    console.error("Errore nella cattura del pagamento PayPal:", error);
+    throw new Error("Impossibile completare il pagamento");
   }
 }
 
@@ -215,7 +285,7 @@ app.post('/api/chat', async (req, res) => {
           email: req.body.email || "cliente@example.com"
         };
         
-        // Creazione dell'ordine
+        // Creazione dell'ordine Shopify
         const orderResult = await createShopifyOrder(
           session, 
           req.body.productId, 
@@ -223,19 +293,20 @@ app.post('/api/chat', async (req, res) => {
           customerInfo
         );
         
-        // Creazione dell'intento di pagamento
-        const customerId = req.body.stripeCustomerId; // Assumiamo che sia già registrato
-        const paymentIntent = await createPaymentIntent(
-          orderResult.total, 
-          'eur', 
-          { id: customerId }
+        // Creazione dell'ordine PayPal
+        const paypalOrder = await createPayPalOrder(
+          orderResult.total,
+          'EUR',
+          `Ordine #${orderResult.order.order_number} con commissione servizio`
         );
         
         response = {
           message: `Ho creato un ordine per te. Il totale è ${orderResult.total}€ (inclusa commissione di ${SERVICE_FEE}€).`,
           order: orderResult.order,
           payment: {
-            clientSecret: paymentIntent.client_secret,
+            provider: 'paypal',
+            orderId: paypalOrder.orderId,
+            approvalUrl: paypalOrder.approvalUrl,
             amount: orderResult.total,
             serviceFee: SERVICE_FEE
           }
@@ -262,16 +333,53 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
+// Endpoint per catturare un pagamento PayPal dopo l'approvazione dell'utente
+app.post('/api/capture-payment', async (req, res) => {
+  try {
+    const { paypalOrderId } = req.body;
+    
+    if (!paypalOrderId) {
+      return res.status(400).json({ error: "ID ordine PayPal mancante" });
+    }
+    
+    const captureResult = await capturePayPalOrder(paypalOrderId);
+    
+    res.json({
+      success: true,
+      captureId: captureResult.captureId,
+      status: captureResult.status
+    });
+  } catch (error) {
+    console.error("Errore nella cattura del pagamento:", error);
+    res.status(500).json({ error: "Impossibile completare il pagamento" });
+  }
+});
+
 // Endpoint per le webhook di Shopify
 app.post('/api/shopify/webhooks', async (req, res) => {
   // Implementazione delle webhook per gestire eventi Shopify
   res.status(200).send();
 });
 
-// Endpoint per i webhook di Stripe
-app.post('/api/stripe/webhooks', async (req, res) => {
-  // Implementazione delle webhook per gestire eventi Stripe
-  res.status(200).send();
+// Endpoint per le webhook di PayPal
+app.post('/api/paypal/webhooks', async (req, res) => {
+  // Implementazione delle webhook per gestire eventi PayPal
+  try {
+    const event = req.body;
+    
+    // Verifica dell'evento PayPal (in produzione si dovrebbe verificare la firma)
+    
+    // Esempio di gestione eventi
+    if (event.event_type === 'PAYMENT.CAPTURE.COMPLETED') {
+      // Aggiornare lo stato dell'ordine nel tuo database
+      console.log('Pagamento completato:', event.resource.id);
+    }
+    
+    res.status(200).send();
+  } catch (error) {
+    console.error('Errore webhook PayPal:', error);
+    res.status(500).send();
+  }
 });
 
 // Avvio del server
@@ -281,11 +389,13 @@ app.listen(PORT, () => {
 });
 
 // File .env da creare (esempio)
-/*
+
 OPENAI_API_KEY=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
 SHOPIFY_API_KEY=30d77a9fcf9a7c3d0e66ab68fbc08aeb
 SHOPIFY_API_SECRET=2da34766bf6258b50812fa894fd01cea
 SHOPIFY_HOST_NAME=https://keyboardinhobbiton.github.io/bich/
-STRIPE_SECRET_KEY=your_stripe_secret_key
+PAYPAL_CLIENT_ID=your_paypal_client_id
+PAYPAL_CLIENT_SECRET=your_paypal_client_secret
+APP_URL=https://keyboardinhobbiton.github.io/bich
+NODE_ENV=development
 PORT=3000
-*/
